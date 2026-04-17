@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trip Planner</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, system-ui, sans-serif;
+      background: #f4f7fb;
+      color: #1f2937;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; padding: 2rem; }
+    .app-shell { max-width: 1080px; margin: 0 auto; display: grid; gap: 1.75rem; }
+    header { text-align: center; }
+    header h1 { margin: 0; font-size: clamp(2rem, 2.5vw, 3rem); }
+    header p { margin: 0.75rem auto 0; max-width: 680px; color: #4b5563; }
+    .planner-card, .trip-list, .todo-list {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 24px;
+      padding: 1.5rem;
+      box-shadow: 0 20px 60px rgba(15,23,42,0.05);
+    }
+    .planner-summary { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.25rem; }
+    .stats-row { display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.95rem; color: #374151; }
+    .planner-form { display: grid; gap: 1rem; }
+    label { display: grid; gap: 0.45rem; font-weight: 600; font-size: 0.95rem; }
+    input, textarea {
+      border: 1px solid #d1d5db;
+      border-radius: 14px;
+      padding: 0.9rem 1rem;
+      font: inherit;
+      width: 100%;
+      background: #f9fafb;
+    }
+    input:focus, textarea:focus, button:focus { outline: 2px solid #2563eb; outline-offset: 2px; }
+    textarea { min-height: 100px; resize: vertical; }
+    button {
+      border: none;
+      border-radius: 999px;
+      background: #2563eb;
+      color: white;
+      padding: 0.95rem 1.5rem;
+      cursor: pointer;
+      font-weight: 700;
+      font: inherit;
+      transition: transform 0.18s ease, background 0.18s ease;
+    }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    button:not(:disabled):hover { background: #1d4ed8; transform: translateY(-1px); }
+    .trip-list h2, .todo-list h2 { margin-top: 0; }
+    .empty-state { color: #6b7280; }
+    .trip-grid { display: grid; gap: 1rem; }
+    .trip-card { border: 1px solid #e5e7eb; border-radius: 18px; padding: 1.25rem; background: #f8fafc; }
+    .trip-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+    .trip-card h3 { margin: 0; }
+    .trip-card p { margin: 0.25rem 0 0; color: #475569; }
+    .trip-notes { margin-top: 1rem; color: #334155; line-height: 1.6; }
+    .remove-button {
+      background: transparent;
+      border: 1px solid #ef4444;
+      color: #b91c1c;
+      border-radius: 999px;
+      padding: 0.65rem 0.95rem;
+    }
+    .todo-form { display: flex; gap: 0.75rem; margin-bottom: 1.25rem; }
+    .todo-form input { flex: 1; }
+    .todo-count { font-size: 0.9rem; color: #6b7280; margin: 0 0 0.75rem; }
+    .todo-items { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.5rem; }
+    .todo-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.85rem 1rem;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      background: #f8fafc;
+    }
+    .todo-item span { flex: 1; }
+    .todo-item.done span { text-decoration: line-through; color: #9ca3af; }
+    .todo-item input[type="checkbox"] { width: 1.1rem; height: 1.1rem; accent-color: #2563eb; cursor: pointer; }
+    @media (min-width: 900px) {
+      .planner-card, .trip-list, .todo-list { padding: 2rem; }
+      .planner-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      label:nth-child(4) { grid-column: span 2; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    function App() {
+      const [destination, setDestination] = useState('');
+      const [startDate, setStartDate] = useState('');
+      const [endDate, setEndDate] = useState('');
+      const [notes, setNotes] = useState('');
+      const [trips, setTrips] = useState([]);
+      const [todoText, setTodoText] = useState('');
+      const [todos, setTodos] = useState([]);
+
+      const canAdd = destination.trim() !== '' && startDate !== '' && endDate !== '';
+
+      const addTrip = () => {
+        if (!canAdd) return;
+        setTrips(current => [{ id: crypto.randomUUID(), destination: destination.trim(), startDate, endDate, notes: notes.trim() }, ...current]);
+        setDestination(''); setStartDate(''); setEndDate(''); setNotes('');
+      };
+
+      const removeTrip = (id) => setTrips(current => current.filter(t => t.id !== id));
+
+      const addTodo = () => {
+        if (!todoText.trim()) return;
+        setTodos(current => [{ id: crypto.randomUUID(), text: todoText.trim(), done: false }, ...current]);
+        setTodoText('');
+      };
+
+      const toggleTodo = (id) => setTodos(current => current.map(t => t.id === id ? { ...t, done: !t.done } : t));
+      const removeTodo = (id) => setTodos(current => current.filter(t => t.id !== id));
+
+      const summary = useMemo(() => {
+        if (trips.length === 0) return 'Add your first trip details to get started.';
+        const earliest = new Date(Math.min(...trips.map(t => new Date(t.startDate).getTime())));
+        return `Next trip starts on ${earliest.toLocaleDateString()}.`;
+      }, [trips]);
+
+      const totalTrips = trips.length;
+      const upcomingTrips = trips.filter(t => new Date(t.startDate) >= new Date()).length;
+
+      return (
+        <div className="app-shell">
+          <header>
+            <h1>Trip Planner</h1>
+            <p>Plan trips, track dates, and save notes for every getaway.</p>
+          </header>
+
+          <section className="planner-card">
+            <div className="planner-summary">
+              <p>{summary}</p>
+              <div className="stats-row">
+                <span>Total trips: {totalTrips}</span>
+                <span>Upcoming: {upcomingTrips}</span>
+              </div>
+            </div>
+            <div className="planner-form">
+              <label>Destination<input value={destination} onChange={e => setDestination(e.target.value)} placeholder="City, country or region" /></label>
+              <label>Start date<input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></label>
+              <label>End date<input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></label>
+              <label>Notes<textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Packing, reservations, reminders" /></label>
+              <button type="button" disabled={!canAdd} onClick={addTrip}>Add trip</button>
+            </div>
+          </section>
+
+          <section className="trip-list">
+            <h2>Your trips</h2>
+            {trips.length === 0 ? (
+              <p className="empty-state">No trips saved yet.</p>
+            ) : (
+              <div className="trip-grid">
+                {trips.map(trip => (
+                  <article className="trip-card" key={trip.id}>
+                    <div className="trip-card-header">
+                      <div>
+                        <h3>{trip.destination}</h3>
+                        <p>{trip.startDate} → {trip.endDate}</p>
+                      </div>
+                      <button className="remove-button" onClick={() => removeTrip(trip.id)}>Remove</button>
+                    </div>
+                    {trip.notes && <p className="trip-notes">{trip.notes}</p>}
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="todo-list">
+            <h2>To-do</h2>
+            <div className="todo-form">
+              <input value={todoText} onChange={e => setTodoText(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTodo()} placeholder="Add a task..." />
+              <button type="button" disabled={!todoText.trim()} onClick={addTodo}>Add</button>
+            </div>
+            {todos.length === 0 ? (
+              <p className="empty-state">No tasks yet.</p>
+            ) : (
+              <>
+                <p className="todo-count">{todos.filter(t => t.done).length} / {todos.length} completed</p>
+                <ul className="todo-items">
+                  {todos.map(todo => (
+                    <li key={todo.id} className={`todo-item${todo.done ? ' done' : ''}`}>
+                      <input type="checkbox" checked={todo.done} onChange={() => toggleTodo(todo.id)} />
+                      <span>{todo.text}</span>
+                      <button className="remove-button" onClick={() => removeTodo(todo.id)}>Remove</button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
