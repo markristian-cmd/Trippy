@@ -8,38 +8,36 @@ type TripItem = {
   notes: string;
 };
 
-type TodoItem = {
-  id: string;
-  text: string;
-  done: boolean;
-};
+function formatDate(iso: string) {
+  return new Date(iso + 'T00:00').toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+}
 
-const initialTrips: TripItem[] = [];
+function getDuration(start: string, end: string) {
+  const days = Math.round(
+    (new Date(end + 'T00:00').getTime() - new Date(start + 'T00:00').getTime()) / 86_400_000
+  ) + 1;
+  return days === 1 ? '1 day' : `${days} days`;
+}
 
 function App() {
   const [destination, setDestination] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [notes, setNotes] = useState('');
-  const [trips, setTrips] = useState<TripItem[]>(initialTrips);
-  const [todoText, setTodoText] = useState('');
-  const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [trips, setTrips] = useState<TripItem[]>([]);
 
   const canAdd = destination.trim() !== '' && startDate !== '' && endDate !== '';
 
-  const totalTrips = trips.length;
-  const upcomingTrips = trips.filter((trip) => new Date(trip.startDate) >= new Date()).length;
+  const upcomingTrips = trips.filter((t) => new Date(t.startDate) >= new Date()).length;
 
   const addTrip = () => {
     if (!canAdd) return;
-    const item: TripItem = {
-      id: crypto.randomUUID(),
-      destination: destination.trim(),
-      startDate,
-      endDate,
-      notes: notes.trim(),
-    };
-    setTrips((current) => [item, ...current]);
+    setTrips((current) => [
+      { id: crypto.randomUUID(), destination: destination.trim(), startDate, endDate, notes: notes.trim() },
+      ...current,
+    ]);
     setDestination('');
     setStartDate('');
     setEndDate('');
@@ -47,36 +45,23 @@ function App() {
   };
 
   const removeTrip = (id: string) => {
-    setTrips((current) => current.filter((trip) => trip.id !== id));
-  };
-
-  const addTodo = () => {
-    if (!todoText.trim()) return;
-    setTodos((current) => [{ id: crypto.randomUUID(), text: todoText.trim(), done: false }, ...current]);
-    setTodoText('');
-  };
-
-  const toggleTodo = (id: string) => {
-    setTodos((current) => current.map((t) => t.id === id ? { ...t, done: !t.done } : t));
-  };
-
-  const removeTodo = (id: string) => {
-    setTodos((current) => current.filter((t) => t.id !== id));
+    setTrips((current) => current.filter((t) => t.id !== id));
   };
 
   const summary = useMemo(() => {
-    if (trips.length === 0) {
-      return 'Add your first trip details to get started.';
-    }
-    const dates = trips.map((trip) => new Date(trip.startDate));
-    const earliest = new Date(Math.min(...dates.map((d) => d.getTime())));
-    return `Next trip starts on ${earliest.toLocaleDateString()}.`;
+    if (trips.length === 0) return 'Where will you go next?';
+    const upcoming = trips
+      .filter((t) => new Date(t.startDate) >= new Date())
+      .sort((a, b) => a.startDate.localeCompare(b.startDate));
+    if (upcoming.length === 0) return 'All trips are in the past — time to plan a new one.';
+    return `Next: ${upcoming[0].destination}, departing ${formatDate(upcoming[0].startDate)}`;
   }, [trips]);
 
   return (
     <div className="app-shell">
       <header>
-        <h1>Trip Planner</h1>
+        <h1>Trip <span>Planner</span></h1>
+        <div className="header-rule"><div className="header-rule-diamond" /></div>
         <p>Plan trips, track dates, and save notes for every getaway.</p>
       </header>
 
@@ -84,50 +69,70 @@ function App() {
         <div className="planner-summary">
           <p>{summary}</p>
           <div className="stats-row">
-            <span>Total trips: {totalTrips}</span>
-            <span>Upcoming: {upcomingTrips}</span>
+            <span><strong>{trips.length}</strong> total</span>
+            <span><strong>{upcomingTrips}</strong> upcoming</span>
           </div>
         </div>
 
+        <p className="section-label">New destination</p>
         <div className="planner-form">
           <label>
             Destination
             <input
               value={destination}
-              onChange={(event) => setDestination(event.target.value)}
+              onChange={(e) => setDestination(e.target.value)}
               placeholder="City, country or region"
             />
           </label>
           <label>
             Start date
-            <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </label>
           <label>
             End date
-            <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </label>
           <label>
             Notes
-            <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Packing, reservations, reminders" />
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Packing list, reservations, reminders…"
+            />
           </label>
-          <button type="button" disabled={!canAdd} onClick={addTrip}>
+          <button type="button" className="add-button" disabled={!canAdd} onClick={addTrip}>
             Add trip
           </button>
         </div>
       </section>
 
       <section className="trip-list">
-        <h2>Your trips</h2>
+        <div className="trip-list-header">
+          <h2>Your trips</h2>
+          {trips.length > 0 && (
+            <span className="trip-count-badge">{trips.length} saved</span>
+          )}
+        </div>
+
         {trips.length === 0 ? (
           <p className="empty-state">No trips saved yet.</p>
         ) : (
           <div className="trip-grid">
-            {trips.map((trip) => (
-              <article className="trip-card" key={trip.id}>
+            {trips.map((trip, i) => (
+              <article
+                className="trip-card"
+                key={trip.id}
+                style={{ animationDelay: `${i * 60}ms` }}
+              >
                 <div className="trip-card-header">
                   <div>
                     <h3>{trip.destination}</h3>
-                    <p>{trip.startDate} → {trip.endDate}</p>
+                    <p className="trip-dates">
+                      {formatDate(trip.startDate)}
+                      <span className="arrow">▶</span>
+                      {formatDate(trip.endDate)}
+                      <span className="trip-duration">{getDuration(trip.startDate, trip.endDate)}</span>
+                    </p>
                   </div>
                   <button className="remove-button" onClick={() => removeTrip(trip.id)}>
                     Remove
@@ -137,34 +142,6 @@ function App() {
               </article>
             ))}
           </div>
-        )}
-      </section>
-      <section className="todo-list">
-        <h2>To-do</h2>
-        <div className="todo-form">
-          <input
-            value={todoText}
-            onChange={(e) => setTodoText(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addTodo()}
-            placeholder="Add a task..."
-          />
-          <button type="button" disabled={!todoText.trim()} onClick={addTodo}>Add</button>
-        </div>
-        {todos.length === 0 ? (
-          <p className="empty-state">No tasks yet.</p>
-        ) : (
-          <>
-            <p className="todo-count">{todos.filter((t) => t.done).length} / {todos.length} completed</p>
-            <ul className="todo-items">
-              {todos.map((todo) => (
-                <li key={todo.id} className={`todo-item${todo.done ? ' done' : ''}`}>
-                  <input type="checkbox" checked={todo.done} onChange={() => toggleTodo(todo.id)} />
-                  <span>{todo.text}</span>
-                  <button className="remove-button" onClick={() => removeTodo(todo.id)}>Remove</button>
-                </li>
-              ))}
-            </ul>
-          </>
         )}
       </section>
     </div>
