@@ -62,6 +62,7 @@
     .trip-card h3 { margin: 0; }
     .trip-card p { margin: 0.25rem 0 0; color: #475569; }
     .trip-notes { margin-top: 1rem; color: #334155; line-height: 1.6; }
+    .trip-card-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
     .remove-button {
       background: transparent;
       border: 1px solid #ef4444;
@@ -69,6 +70,14 @@
       border-radius: 999px;
       padding: 0.65rem 0.95rem;
     }
+    .download-button {
+      background: transparent;
+      border: 1px solid #2563eb;
+      color: #2563eb;
+      border-radius: 999px;
+      padding: 0.65rem 0.95rem;
+    }
+    .download-button:hover { background: #eff6ff; transform: translateY(-1px); }
     .todo-form { display: flex; gap: 0.75rem; margin-bottom: 1.25rem; }
     .todo-form input { flex: 1; }
     .todo-count { font-size: 0.9rem; color: #6b7280; margin: 0 0 0.75rem; }
@@ -125,6 +134,30 @@
       const toggleTodo = (id) => setTodos(current => current.map(t => t.id === id ? { ...t, done: !t.done } : t));
       const removeTodo = (id) => setTodos(current => current.filter(t => t.id !== id));
 
+      const downloadItinerary = (trip) => {
+        const content = [
+          '============================',
+          '        TRIP ITINERARY',
+          '============================',
+          '',
+          `Destination : ${trip.destination}`,
+          `Start Date  : ${new Date(trip.startDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`,
+          `End Date    : ${new Date(trip.endDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`,
+          '',
+          trip.notes ? `Notes:\n${trip.notes}` : '',
+          '',
+          '============================',
+          `Downloaded on ${new Date().toLocaleDateString()}`,
+        ].join('\n');
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${trip.destination.replace(/\s+/g, '_')}_itinerary.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
       const summary = useMemo(() => {
         if (trips.length === 0) return 'Add your first trip details to get started.';
         const earliest = new Date(Math.min(...trips.map(t => new Date(t.startDate).getTime())));
@@ -171,7 +204,10 @@
                         <h3>{trip.destination}</h3>
                         <p>{trip.startDate} → {trip.endDate}</p>
                       </div>
-                      <button className="remove-button" onClick={() => removeTrip(trip.id)}>Remove</button>
+                      <div className="trip-card-actions">
+                        <button className="download-button" onClick={() => downloadItinerary(trip)}>Download</button>
+                        <button className="remove-button" onClick={() => removeTrip(trip.id)}>Remove</button>
+                      </div>
                     </div>
                     {trip.notes && <p className="trip-notes">{trip.notes}</p>}
                   </article>
